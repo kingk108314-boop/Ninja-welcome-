@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Ninja: Welcome to India</title>
+<!-- Ruhvel Studios · Telegram Mini App build. Host this file on HTTPS, then set its URL in @BotFather. -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;height:100%;background:#1b0f08;color:#ffe9c7;font-family:system-ui,"Noto Sans Devanagari",sans-serif;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#app{max-width:720px;margin:0 auto;padding:8px;display:flex;flex-direction:column;gap:10px}
+canvas{width:100%;height:auto;border-radius:12px;border:3px solid #ff9933;background:#000;display:block}
+.btns{display:flex;gap:10px}
+button{flex:1;padding:22px 0;font-size:20px;font-weight:800;border:0;border-radius:14px;color:#fff;touch-action:manipulation}
+#bj{background:#138808}#bs{background:#e8590c}
+button:active{transform:scale(.96);filter:brightness(1.2)}
+.foot{text-align:center;font-size:12px;opacity:.7}
+.lbbtn{background:#5b3a1e;padding:14px 0;font-size:16px}
+#bm{flex:none;width:70px}
+#lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px;z-index:5}
+.panel{background:#2a170d;border:2px solid #ff9933;border-radius:14px;padding:16px;width:100%;max-width:360px}
+.panel h2{margin:0 0 4px}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #4a2c18}
+.panel label{display:block;margin:12px 0}
+.panel input{margin-left:6px;padding:6px;border-radius:6px;border:1px solid #ff9933;background:#1b0f08;color:#ffe9c7;font-size:16px;width:140px}
+#lbx{margin-top:4px;padding:12px 0;background:#e8590c;width:100%}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="c" width="480" height="300"></canvas>
+<div class="btns"><button id="bj">⬆ JUMP</button><button id="bs">✦ STAR</button></div>
+<div class="btns"><button id="bl" class="lbbtn">🏆 Leaderboard</button><button id="bm" class="lbbtn">🔊</button></div>
+<div class="foot">Ruhvel Studios · Space/↑ = jump · X/→ = star</div>
+<div id="lb"><div class="panel"><h2>🏆 Leaderboard</h2><small id="lbn"></small><div id="lbl"></div><label>Your name<input id="nm" maxlength="12"></label><button id="lbx">Close</button></div></div>
+</div>
+<script>
+// ===== Settings =====
+// Leave API_URL empty to keep scores on the player's device only.
+// To get a global leaderboard, put your server address here (see notes: GET /top, POST /score).
+const API_URL='';
+
+// ===== Telegram =====
+const TG=window.Telegram&&window.Telegram.WebApp;
+if(TG){try{TG.ready();TG.expand();TG.setHeaderColor('#1b0f08');TG.setBackgroundColor('#1b0f08');if(TG.disableVerticalSwipes)TG.disableVerticalSwipes()}catch(e){}}
+
+// ===== Game =====
+const c=document.getElementById('c'),x=c.getContext('2d');
+const W=480,H=300,G=240;
+let st='menu',N,obs,stars,coins,parts,dist,score,coinN,speed,spawnT,coinT,cool,bg,t=0,best=0,shake=0,over_t=0;
+try{best=+localStorage.getItem('nwi_best')||0}catch(e){}
+function reset(){N={x:60,y:G,vy:0,w:22,h:36,air:false};obs=[];stars=[];coins=[];parts=[];dist=0;score=0;coinN=0;speed=230;spawnT=300;coinT=200;cool=0;bg=0}
+reset();
+function jump(){if(st!=='play'){start();return}if(!N.air){N.vy=-640;N.air=true;sfx('jump')}}
+function throwStar(){if(st!=='play'){start();return}if(cool<=0){stars.push({x:N.x+20,y:N.y-22,a:0});cool=.32;sfx('star')}}
+function start(){if(st==='over'&&over_t>0)return;reset();st='play';sfx('start')}
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(['Space','ArrowUp'].includes(e.code)){e.preventDefault();jump()}if(['KeyX','ArrowRight','KeyZ'].includes(e.code)){e.preventDefault();throwStar()}});
+bj.addEventListener('pointerdown',e=>{e.preventDefault();jump()});
+bs.addEventListener('pointerdown',e=>{e.preventDefault();throwStar()});
+c.addEventListener('pointerdown',()=>{if(st!=='play')start()});
+const R=(a,b)=>a+Math.random()*(b-a);
+function boom(px,py,col){for(let i=0;i<10;i++)parts.push({x:px,y:py,vx:R(-160,160),vy:R(-200,60),l:.6,col})}
+function spawn(){
+ const r=Math.random();
+ if(r<.22)obs.push({k:'bamboo',x:W+20,w:18,h:R(55,95),y:G});
+ else if(r<.4)obs.push({k:'sheep',x:W+20,w:44,h:34,y:G});
+ else if(r<.55)obs.push({k:'rickshaw',x:W+20,w:58,h:38,y:G});
+ else if(r<.7)obs.push({k:'cobra',x:W+20,w:24,h:30,y:G});
+ else if(r<.85)obs.push({k:'monkey',x:W+20,w:26,h:28,y:G,ph:R(0,6)});
+ else obs.push({k:'crow',x:W+20,w:28,h:16,y:G-R(48,85),ph:R(0,6)});
+}
+function hit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function die(){st='over';over_t=.6;shake=.3;if(score>best){best=score;try{localStorage.setItem('nwi_best',best)}catch(e){}}boom(N.x+10,N.y-18,'#111');sfx('die');submitScore(score)}
+function update(d){
+ t+=d;bg+=d*(st==='play'?speed:60);
+ for(const p of parts){p.x+=p.vx*d;p.y+=p.vy*d;p.vy+=500*d;p.l-=d}parts=parts.filter(p=>p.l>0);
+ if(shake>0)shake-=d;if(over_t>0)over_t-=d;
+ if(st!=='play')return;
+ speed=Math.min(230+dist*.018,480);dist+=speed*d;score=Math.floor(dist/10)+coinN*5;cool-=d;
+ N.vy+=1800*d;N.y+=N.vy*d;if(N.y>=G){N.y=G;N.vy=0;N.air=false}
+ spawnT-=speed*d;if(spawnT<=0){spawn();spawnT=R(260,420)+speed*.25}
+ coinT-=speed*d;if(coinT<=0){const by=R(G-110,G-30);for(let i=0;i<4;i++)coins.push({x:W+20+i*30,y:by-(i%2?8:0),r:8});coinT=R(500,800)}
+ for(const o of obs)o.x-=(speed+(o.k==='crow'?70:0))*d;
+ for(const o of obs)if(o.k==='monkey')o.y=G-Math.abs(Math.sin(t*6+o.ph))*45;
+ for(const q of coins)q.x-=speed*d;
+ for(const s of stars){s.x+=560*d;s.a+=d*20}
+ for(const s of stars)for(const o of obs){
+  if(o.k==='sheep'||o.k==='rickshaw'){if(s.x>o.x&&s.x<o.x+o.w&&s.y>o.y-o.h&&s.y<o.y){s.dead=1;boom(s.x,s.y,'#ccc')}}
+  else if(!o.dead&&s.x>o.x-4&&s.x<o.x+o.w+4&&s.y>o.y-o.h&&s.y<o.y){o.dead=1;s.dead=1;dist+=60;sfx('smash');boom(o.x+o.w/2,o.y-o.h/2,o.k==='crow'?'#222':'#4caf50')}
+ }
+ stars=stars.filter(s=>!s.dead&&s.x<W+20);
+ obs=obs.filter(o=>!o.dead&&o.x>-80);coins=coins.filter(q=>q.x>-20);
+ const nb={x:N.x+3,y:N.y-N.h+3,w:N.w-6,h:N.h-6};
+ for(const o of obs){if(hit(nb,{x:o.x+3,y:o.y-o.h+3,w:o.w-6,h:o.h-6})){die();return}}
+ for(const q of coins){if(!q.got&&Math.hypot(q.x-(N.x+11),q.y-(N.y-18))<22){q.got=1;coinN++;sfx('coin');boom(q.x,q.y,'#ffb703')}}
+ coins=coins.filter(q=>!q.got);
+}
+function taj(ox){
+ x.fillStyle='#8c3b2a';x.fillRect(ox,G-70,150,70);
+ x.beginPath();x.arc(ox+75,G-70,34,Math.PI,0);x.fill();
+ x.fillRect(ox+72,G-112,6,14);
+ for(const m of[-12,150]){x.fillRect(ox+m,G-96,12,96);x.beginPath();x.arc(ox+m+6,G-96,8,Math.PI,0);x.fill()}
+ x.fillStyle='#5e2418';x.beginPath();x.arc(ox+75,G,18,Math.PI,0);x.fill();
+}
+function draw(){
+ x.save();if(shake>0)x.translate(R(-4,4),R(-4,4));
+ let g=x.createLinearGradient(0,0,0,G);g.addColorStop(0,'#ff9933');g.addColorStop(.6,'#ffd29a');g.addColorStop(1,'#ffe9c7');
+ x.fillStyle=g;x.fillRect(0,0,W,H);
+ x.fillStyle='#ffefd0';x.beginPath();x.arc(380,70,34,0,7);x.fill();
+ const tx=-((bg*.15)%700);
+ for(let i=0;i<2;i++)taj(tx+i*700+60);
+ x.fillStyle='#e07b39';
+ for(let i=0;i<3;i++){const ox=-((bg*.3)%500)+i*500;x.fillRect(ox+200,G-30,60,30);x.beginPath();x.arc(ox+230,G-30,20,Math.PI,0);x.fill()}
+ x.fillStyle='#8b5a2b';x.fillRect(0,G,W,H-G);
+ x.fillStyle='#138808';x.fillRect(0,G,W,6);
+ x.fillStyle='#c9a06b';for(let i=0;i<12;i++){x.fillRect(((i*60-bg)%W+W)%W,G+22,28,4)}
+ x.fillStyle='#ff9933';x.fillRect(0,0,W,4);x.fillStyle='#fff';x.fillRect(0,4,W,4);x.fillStyle='#138808';x.fillRect(0,8,W,4);
+ for(const q of coins){x.fillStyle='#ffb703';x.beginPath();x.arc(q.x,q.y,q.r,0,7);x.fill();x.fillStyle='#e85d04';x.beginPath();x.arc(q.x,q.y,q.r-3,0,7);x.fill()}
+ for(const o of obs){
+  if(o.k==='bamboo'){x.fillStyle='#4a8f2a';x.fillRect(o.x,o.y-o.h,o.w,o.h);x.fillStyle='#2f6a17';for(let yy=o.y-o.h+14;yy<o.y;yy+=18)x.fillRect(o.x-2,yy,o.w+4,3);x.fillStyle='#6bbf3a';x.fillRect(o.x+o.w,o.y-o.h+8,14,4)}
+  else if(o.k==='sheep'){x.fillStyle='#4a3a30';x.fillRect(o.x+6,o.y-10,5,10);x.fillRect(o.x+o.w-18,o.y-10,5,10);x.fillStyle='#fffaf0';for(const [cx,cy,r] of [[8,-20,10],[20,-24,11],[32,-20,10],[16,-14,10],[28,-14,10]]){x.beginPath();x.arc(o.x+cx,o.y+cy,r,0,7);x.fill()}x.fillStyle='#3b2f2a';x.beginPath();x.arc(o.x+o.w-4,o.y-18,7,0,7);x.fill();x.fillStyle='#fff';x.fillRect(o.x+o.w-2,o.y-20,2,2)}
+  else if(o.k==='rickshaw'){x.fillStyle='#ffc107';x.fillRect(o.x+2,o.y-o.h,o.w-8,10);x.fillStyle='#138808';x.fillRect(o.x+2,o.y-22,o.w-4,14);x.fillStyle='#bfe3ff';x.fillRect(o.x+o.w-16,o.y-o.h+10,10,12);x.fillStyle='#333';x.fillRect(o.x+6,o.y-o.h+10,3,12);x.fillStyle='#111';for(const wx of [12,o.w-8]){x.beginPath();x.arc(o.x+wx,o.y-6,6,0,7);x.fill()}}
+  else if(o.k==='cobra'){x.fillStyle='#6d4c41';x.fillRect(o.x,o.y-10,o.w,10);x.fillStyle='#2e7d32';x.fillRect(o.x+8,o.y-26,8,16);x.beginPath();x.ellipse(o.x+12,o.y-26,10,7,0,0,7);x.fill();x.fillStyle='#fff';x.fillRect(o.x+16,o.y-28,2,2);x.fillStyle='#d62828';x.fillRect(o.x+22,o.y-24,5,1)}
+  else if(o.k==='monkey'){x.fillStyle='#795548';x.fillRect(o.x+4,o.y-o.h+8,16,14);x.beginPath();x.arc(o.x+18,o.y-o.h+6,7,0,7);x.fill();x.fillStyle='#e0b48a';x.beginPath();x.arc(o.x+20,o.y-o.h+7,4,0,7);x.fill();x.fillStyle='#795548';x.fillRect(o.x+4,o.y-8,5,8);x.fillRect(o.x+16,o.y-8,5,8);x.fillRect(o.x-6,o.y-o.h+10,8,3);x.fillRect(o.x-8,o.y-o.h+4,3,9)}
+  else{const f=Math.sin(t*20+o.ph)*5;x.fillStyle='#222';x.fillRect(o.x,o.y-o.h+4,o.w,10);x.beginPath();x.moveTo(o.x+8,o.y-o.h+6);x.lineTo(o.x+16,o.y-o.h-6+f);x.lineTo(o.x+22,o.y-o.h+6);x.fill();x.fillStyle='#ffb703';x.fillRect(o.x-6,o.y-o.h+7,6,3)}
+ }
+ for(const s of stars){x.save();x.translate(s.x,s.y);x.rotate(s.a);x.fillStyle='#d9d9d9';x.beginPath();for(let i=0;i<8;i++){const r=i%2?3:8,a=i*Math.PI/4;x.lineTo(Math.cos(a)*r,Math.sin(a)*r)}x.fill();x.restore()}
+ if(st!=='over'||over_t>0.3){
+  const rn=Math.sin(t*18)*(N.air?0:6);
+  x.fillStyle='#111';x.fillRect(N.x+2,N.y-14,7,14+(N.air?0:rn*.3));x.fillRect(N.x+13,N.y-14,7,14-(N.air?0:rn*.3));
+  x.fillRect(N.x,N.y-N.h+10,N.w,16);
+  x.fillStyle='#ff9933';x.fillRect(N.x,N.y-N.h+8,N.w,5);
+  x.fillStyle='#111';x.fillRect(N.x+2,N.y-N.h-2,18,14);
+  x.fillStyle='#f1c9a0';x.fillRect(N.x+8,N.y-N.h+2,12,5);
+  x.fillStyle='#000';x.fillRect(N.x+15,N.y-N.h+3,3,3);
+  x.fillStyle='#d62828';x.fillRect(N.x-1,N.y-N.h+1,22,3);x.fillRect(N.x-10,N.y-N.h+2,10,3+Math.sin(t*15)*2);
+ }
+ for(const p of parts){x.globalAlpha=Math.max(p.l,0);x.fillStyle=p.col;x.fillRect(p.x,p.y,4,4)}x.globalAlpha=1;
+ x.fillStyle='#fff';x.font='bold 18px system-ui,sans-serif';x.textAlign='left';x.fillText('Score '+score,12,32);
+ x.fillStyle='#ffb703';x.fillText('● '+coinN,12,54);
+ x.textAlign='right';x.fillStyle='#fff';x.fillText('Best '+best,W-12,32);
+ if(st!=='play'){
+  x.fillStyle='rgba(20,8,0,.62)';x.fillRect(0,0,W,H);x.textAlign='center';
+  if(st==='menu'){
+   x.fillStyle='#ff9933';x.font='bold 40px system-ui,sans-serif';x.fillText('NINJA',W/2,95);
+   x.fillStyle='#fff';x.font='bold 22px system-ui,sans-serif';x.fillText('Welcome to India',W/2,128);
+   x.fillStyle='#8be36f';x.font='bold 20px system-ui,sans-serif';x.fillText('Slice through the streets of India',W/2,160);
+   x.fillStyle='#ffe9c7';x.font='14px system-ui,sans-serif';x.fillText('Star: bamboo, crows, cobras, monkeys. Jump: sheep, rickshaws!',W/2,194);
+   x.fillText('Tap to start',W/2,218);
+   x.fillStyle='#aaa';x.font='12px system-ui,sans-serif';x.fillText('Ruhvel Studios',W/2,276);
+  }else{
+   x.fillStyle='#ff5a4d';x.font='bold 36px system-ui,sans-serif';x.fillText('GAME OVER',W/2,110);
+   x.fillStyle='#fff';x.font='bold 22px system-ui,sans-serif';x.fillText('Score '+score+'   Best '+best,W/2,150);
+   x.fillStyle='#ffe9c7';x.font='15px system-ui,sans-serif';x.fillText('Tap to play again',W/2,190);
+  }
+ }
+ x.restore();
+}
+
+// ===== Leaderboard =====
+const lbEl=document.getElementById('lb'),lbList=document.getElementById('lbl'),nm=document.getElementById('nm'),lbNote=document.getElementById('lbn');
+let rows=[],remote=false,pname='Ninja',local=[];
+try{pname=localStorage.getItem('nwi_name')||'Ninja';local=JSON.parse(localStorage.getItem('nwi_top')||'[]')}catch(e){}
+try{const u=TG&&TG.initDataUnsafe&&TG.initDataUnsafe.user;if(u&&u.first_name)pname=String(u.first_name).slice(0,12)}catch(e){}
+nm.value=pname;
+nm.addEventListener('input',()=>{pname=nm.value.trim().slice(0,12)||'Ninja';try{localStorage.setItem('nwi_name',pname)}catch(e){}});
+function renderLB(){
+ lbList.textContent='';
+ const list=remote?rows:local;
+ lbNote.textContent=remote?'Global top 10':'Top scores on this device';
+ if(!list.length){const p=document.createElement('p');p.textContent='No scores yet. Be the first!';lbList.appendChild(p);return}
+ list.slice(0,10).forEach((r,i)=>{const d=document.createElement('div');d.className='row';const a=document.createElement('span');a.textContent=(i+1)+'. '+String(r.name||'Ninja').slice(0,12);const b=document.createElement('b');b.textContent=r.score;d.append(a,b);lbList.appendChild(d)});
+}
+async function loadTop(){if(!API_URL)return;try{const r=await fetch(API_URL+'/top');rows=await r.json();remote=true;renderLB()}catch(e){}}
+function submitScore(sc){
+ if(sc<=0)return;
+ local.push({name:pname,score:sc});local.sort((a,b)=>b.score-a.score);local=local.slice(0,10);
+ try{localStorage.setItem('nwi_top',JSON.stringify(local))}catch(e){}
+ if(API_URL){try{fetch(API_URL+'/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:TG?TG.initData:'',score:sc,name:pname})}).then(loadTop).catch(()=>{})}catch(e){}}
+ renderLB();
+}
+document.getElementById('bl').onclick=()=>{if(st==='play')return;loadTop();renderLB();lbEl.style.display='flex'};
+document.getElementById('lbx').onclick=()=>{lbEl.style.display='none'};
+renderLB();
+
+// ===== Sound =====
+let AC=null,muted=false;
+try{muted=localStorage.getItem('nwi_mute')==='1'}catch(e){}
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC}
+function tone(f1,f2,dur,type,vol){const a=ac();if(!a||muted)return;const o=a.createOscillator(),g=a.createGain(),n=a.currentTime;o.type=type||'square';o.frequency.setValueAtTime(f1,n);o.frequency.exponentialRampToValueAtTime(Math.max(f2,30),n+dur);g.gain.setValueAtTime(vol||.12,n);g.gain.exponentialRampToValueAtTime(.001,n+dur);o.connect(g);g.connect(a.destination);o.start();o.stop(n+dur)}
+function noise(dur,vol){const a=ac();if(!a||muted)return;const n=Math.floor(a.sampleRate*dur),b=a.createBuffer(1,n,a.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);const s=a.createBufferSource(),g=a.createGain();s.buffer=b;g.gain.value=vol||.15;s.connect(g);g.connect(a.destination);s.start()}
+const SFX={jump:()=>tone(300,700,.15,'square',.08),star:()=>tone(1200,600,.08,'triangle',.1),coin:()=>{tone(880,880,.08,'sine',.12);setTimeout(()=>tone(1320,1320,.12,'sine',.12),70)},smash:()=>{noise(.15,.15);tone(200,80,.12,'sawtooth',.08)},die:()=>{tone(400,60,.5,'sawtooth',.15);noise(.3,.12)},start:()=>{[523,659,784].forEach((f,i)=>setTimeout(()=>tone(f,f,.12,'triangle',.12),i*90))}};
+function sfx(n){try{SFX[n]()}catch(e){}}
+const bm=document.getElementById('bm');bm.textContent=muted?'🔇':'🔊';
+bm.onclick=()=>{muted=!muted;bm.textContent=muted?'🔇':'🔊';try{localStorage.setItem('nwi_mute',muted?'1':'0')}catch(e){}ac()};
+
+// ===== Loop =====
+let last=performance.now();
+function loop(n){const d=Math.min((n-last)/1000,.05);last=n;update(d);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
